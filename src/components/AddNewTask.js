@@ -1,0 +1,115 @@
+import React, { useState, useEffect } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import axios from 'axios';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+
+const baseUrl = process.env.REACT_APP_BASEURL;
+
+const AddNewTask = () => {
+  const [showForm, setShowForm] = useState(false);
+  const [tasks, setTasks] = useState([]);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const response = await axios.get(`${baseUrl}/api/task`, {
+          params: { status: 'To Do' },
+        });
+        setTasks(response.data);
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+      }
+    };
+
+    fetchTasks();
+  }, []);
+
+  const handleToggleForm = () => {
+    setShowForm(!showForm);
+  };
+
+  const handleAddTask = async (e) => {
+    e.preventDefault();
+    const newTask = {
+      title: e.target.title.value,
+      description: e.target.description.value,
+      assignedTo: e.target.assignedTo.value,
+      status: 'To Do',
+    };
+    try {
+      const response = await axios.post(`${baseUrl}/api/task`, newTask);
+      setTasks([...tasks, response.data]);
+      setShowForm(false);
+    } catch (error) {
+      console.error('Error adding task:', error);
+    }
+  };
+
+  const handleDeleteTask = async (id) => {
+    try {
+      await axios.delete(`${baseUrl}/api/task/${id}`);
+      setTasks(tasks.filter((task) => task._id !== id));
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
+  };
+
+  const handleDragEnd = async (result) => {
+    const { destination, source, draggableId } = result;
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) {
+      return;
+    }
+    const updatedTasks = [...tasks];
+    const task = updatedTasks.find((task) => task._id === draggableId);
+    updatedTasks.splice(source.index, 1);
+    try {
+      await axios.put(`${baseUrl}/api/task/${draggableId}`, { status: 'In Progress' });
+      task.status = 'In Progress';
+      setTasks(updatedTasks);
+    } catch (error) {
+      console.error('Error updating task status:', error);
+    }
+  };
+
+  return (
+    <DragDropContext onDragEnd={handleDragEnd}>
+      <div className="column bg-gray-200 p-4 rounded-lg">
+        <h2 className="text-lg font-semibold mb-2">Add New task</h2>
+        <button className="toggle-form-btn bg-blue-500 text-white px-2 py-1 rounded-md mb-2" onClick={handleToggleForm}>
+          <FontAwesomeIcon icon={faPlus} className="mr-1" /> Add Task
+        </button>
+        {showForm && (
+          <form onSubmit={handleAddTask} className="mb-4">
+            <input
+              type="text"
+              name="title"
+              placeholder="Task Title"
+              required
+              className="border border-gray-400 p-2 rounded-md mb-2"
+            />
+            <input
+              type="text"
+              name="description"
+              placeholder="Description"
+              className="border border-gray-400 p-2 rounded-md mb-2"
+            />
+            <input
+              type="text"
+              name="assignedTo"
+              placeholder="Assigned To"
+              className="border border-gray-400 p-2 rounded-md mb-2"
+            />
+            <button type="submit" className="bg-green-500 text-white px-2 py-1 rounded-md">
+              Save
+            </button>
+          </form>
+        )}
+     
+      </div>
+    </DragDropContext>
+  );
+};
+
+export default AddNewTask;
